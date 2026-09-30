@@ -15,11 +15,11 @@
 > Документы которые лягут в базу: Положение о старосте учебной группы: (https://www.mirea.ru/upload/iblock/ad9/sbdu9j5k8xttdzdv898sp15t13kbqu2h/Polozhenie_O_STAROSTE_UCHEBNOI_GRUPPY.pdf),
 
 
- > Правила внутреннего распорядка обучающихся: (https://www.mirea.ru/upload/iblock/55e/faxwb4j67h713ma25a0nq0a6b2wtntki/>Polozhenie_PVR-obuchayushchikhsya_2026_itog.pdf),
+ > Правила внутреннего распорядка обучающихся: (https://stavropol.mirea.ru/wp-content/docs/sveden/document/Polozhenie_PVR-obuchayushchikhsya_2026_itog.pdf),
 
- > Положение о стипендиальном обеспечении: (https://www.mirea.ru/upload/iblock/566/wviihb6gdyd65ifxn3ux2zfg42hq19oa/>Polozhenie_o_stipendialnom_obespechenii_obuchayushchikhsya.pdf),
+ > Положение о стипендиальном обеспечении: (https://www.mirea.ru/upload/iblock/3cf/2it2u96xxkkz6hwy6n30xj61t150kof5/Polozhenie-o-stipendialnom-obespechenii-obuchayushchikhsya.pdf),
 
- > Правила внутреннего распорядка в общежитиях: (https://www.mirea.ru/upload/iblock/48a/91j3r9o5y06wt1oyo5phjdoca2hfcz4m/>PVR_v_studencheskikh_obshchezhitiyakh_2025.pdf).
+ > Правила внутреннего распорядка в общежитиях: (https://www.mirea.ru/upload/iblock/48a/91j3r9o5y06wt1oyo5phjdoca2hfcz4m/PVR_v_studencheskikh_obshchezhitiyakh_2025.pdf).
 
 
 ### Целевая аудитория
