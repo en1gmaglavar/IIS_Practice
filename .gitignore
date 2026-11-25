@@ -11,6 +11,8 @@ env/
 .vscode/
 
 # Тестовые файлы
+Check_fsm.py 
+check_graph.py
 
 # Локальные данные / индексы
 data/chroma/

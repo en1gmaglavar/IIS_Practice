@@ -41,60 +41,78 @@ BLOCKED_REPLY = "Запрос отклонён слоем безопасност
 class Orchestrator:
     """Оркестратор ролей на конечном автомате."""
 
-    # --- Роли. Одна заполнена как образец, вторую добавляете вы (П3). ---
     ROLES: dict[str, dict] = {
         "analyst": {
-            "description": "ищет факты в базе знаний и отвечает со ссылками на источники",
-            "temperature": 0.2,   # факты — низкая температура
-            "filters": {},        # {} = искать по всему индексу
+            "description": (
+                "находит нормы о промежуточной аттестации, пересдачах, "
+                "академических задолженностях, переводах и отчислениях в базе знаний "
+                "и отвечает со ссылками на документы; условия ситуации студента "
+                "(курс, форму обучения, направление) сама не выясняет"
+            ),
+            "temperature": 0.2,
+            "filters": {},
         },
-        # TODO (П3): вторая роль. Например:
-        # "editor": {
-        #     "description": "переписывает ответ аналитика в нужном тоне и формате",
-        #     "temperature": 0.7,
-        #     "filters": {},
-        # },
+        "clarifier": {
+            "description": (
+                "когда вопрос зависит от курса, формы обучения, направления "
+                "подготовки или статуса задолженности и условия не указаны, "
+                "задаёт уточняющий вопрос вместо вынесения решения по норме"
+            ),
+            "temperature": 0.3,
+            "filters": {},
+        },
+        "verifier": {
+            "description": (
+                "перепроверяет утверждения и применимость норм по документам "
+                "при запросе на проверку или спорном случае; если подтверждения "
+                "в корпусе нет или норма не применима, меняет исход на отказ/уточнение"
+            ),
+            "temperature": 0.1,
+            "filters": {},
+        },
     }
 
     INITIAL_ROLE = "analyst"
     FALLBACK_ROLE = "analyst"
 
-    # --- Граф переходов: из какой роли в какие можно перейти (П3). ---
     TRANSITIONS: dict[str, set[str]] = {
-        "analyst": {"analyst"},
-        # TODO (П3): опишите переходы для своих ролей.
-        # Автомат нужен именно для того, чтобы не любой переход был разрешён:
-        # например, из "editor" нельзя уйти в "editor" — редактировать нечего,
-        # пока аналитик не нашёл факты.
+        "analyst": {"analyst", "clarifier", "verifier"},
+        "clarifier": {"analyst", "clarifier"},
+        "verifier": {"analyst", "clarifier"},
     }
 
-    # --- Какой интент какой ролью обслуживается (П3). ---
     INTENT_TO_ROLE: dict[str, str] = {
         "question": "analyst",
-        # TODO (П3): например "rewrite": "editor", "summarize": "editor"
+        "clarify": "clarifier",
+        "verify": "verifier",
     }
 
     def __init__(self):
         self.tools = MCPTools()
         self.llm = build_client()
         memory.create_schema()
-        self._state: dict[str, str] = {}      # session_id -> текущая роль
-        self._context: dict[str, list[Chunk]] = {}  # session_id -> что нашла прошлая роль
-        self.usage: list[dict] = []           # расход токенов по вызовам, на нём считается TCO (П8)
-
-    # --- Ваша часть (П3) ---
+        self._state: dict[str, str] = {}
+        self._context: dict[str, list[Chunk]] = {}
+        self.usage: list[dict] = []
 
     def detect_intent(self, text: str) -> str:
-        """Определить интент реплики. Возвращает ключ из INTENT_TO_ROLE.
+        """Определить интент реплики без LLM и сложных словарей.
 
-        Достаточно правил: ключевые слова, длина, наличие вопросительного знака.
-        LLM для маршрутизации не нужна — она недетерминирована и стоит денег,
-        а маршрут должен быть предсказуемым (Л3: FSM как детерминированная маршрутизация).
-
-        На нераспознанной фразе верните "question" — пусть система отвечает,
-        а не отказывается.
+        На нераспознанной фразе возвращает "question".
         """
-        raise NotImplementedError("П3: реализуйте определение интента")
+        cleaned = (text or "").strip().lower().replace("ё", "е")
+        if not cleaned:
+            return "question"
+
+        # Короткая уточняющая реплика без вопросительного знака (например, "на 2 курсе очно")
+        if len(cleaned.split()) <= 4 and "?" not in cleaned:
+            return "clarify"
+
+        # Запрос на перепроверку или сомнение в предыдущем выводе
+        if "провер" in cleaned or "уверен" in cleaned:
+            return "verify"
+
+        return "question"
 
     # --- Готовая механика: менять не нужно ---
 
@@ -111,8 +129,6 @@ class Orchestrator:
             target = self.FALLBACK_ROLE
 
         if target != current:
-            # Про откат сказано прямо: иначе строка «verifier -> analyst (интент verify)»
-            # читается как «интент verify обслуживается ролью analyst», то есть наоборот.
             log.info("Сессия %s: роль %s -> %s (интент %s%s)",
                      session_id, current, target, intent, ", откат" if rolled_back else "")
 
@@ -142,10 +158,6 @@ class Orchestrator:
         else:
             chunks = self.tools.search(text)
 
-        # Контекст переезжает между ролями: при переключении новая роль видит
-        # и свои фрагменты, и то, что нашла предыдущая, — иначе разговор рвётся.
-        # Признак переноса — смена роли, а не пустая выдача: поиск по реплике
-        # «а в моём случае?» возвращает не ноль фрагментов, а пять нерелевантных.
         if role != previous_role:
             known = {(c.source, c.page, c.text[:80]) for c in chunks}
             chunks = chunks + [c for c in self._context.get(session_id, [])
@@ -153,24 +165,16 @@ class Orchestrator:
         self._context[session_id] = chunks
 
         history = memory.window(session_id)
-
-        # Реплика пользователя сохраняется после чтения окна, а не до него.
-        # Иначе текущий вопрос уходил бы в модель дважды — в истории и в блоке
-        # с фрагментами, — а полезная глубина окна была бы N−1, а не N.
         memory.save(session_id, "user", text)
 
         messages = prompts.build_messages(role, text, chunks, history)
 
-        # Считается одним вызовом по склеенному тексту, а не по сообщению на вызов:
-        # у облачного клиента count_tokens() — обращение к API, и поштучный подсчёт
-        # добавлял бы к каждому вопросу столько сетевых запросов, сколько сообщений.
         prompt_size = self.llm.count_tokens("\n".join(m["content"] for m in messages))
         log.info("Сессия %s: роль %s, чанков %d, промпт ~%d токенов",
                  session_id, role, len(chunks), prompt_size)
 
         answer = self.llm.generate(messages, temperature=role_config["temperature"])
 
-        # Вход и выход считаются раздельно: они тарифицируются по разным ценам (П8)
         self.usage.append({
             "session_id": session_id,
             "role": role,
