@@ -77,4 +77,9 @@ def get_history(session_id: str, n: int = config.MEMORY_WINDOW) -> list[dict]:
 
 
 if __name__ == "__main__":
+    # На Windows первый импорт нативных RAG-библиотек может зависнуть,
+    # если поток MCP уже читает stdin. Импортируем их до запуска stdio.
+    import chromadb
+    import sentence_transformers
+
     mcp.run()
